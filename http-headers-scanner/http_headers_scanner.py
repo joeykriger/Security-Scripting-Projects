@@ -301,6 +301,7 @@ class ScanReport:
     final_url: str
     status_code: int
     findings: list[HeaderFinding]
+    raw_headers: dict[str, str]
 
     @property
     def score(self) -> int:
@@ -493,6 +494,7 @@ def scan(
         final_url = str(response.url),
         status_code = response.status_code,
         findings = findings,
+        raw_headers = response_headers,
     )
 
 
@@ -519,10 +521,15 @@ GRADE_COLORS: dict[str,
                    }
 
 
-def _render_report(report: ScanReport, console: Console) -> None:
+def _render_report(report: ScanReport, console: Console, verbose: bool = False) -> None:
     """
     Print the scan report as a rich table plus a grade panel
     """
+    if verbose:
+        console.print("[bold]Raw response headers:[/bold]")
+        for name in sorted(report.raw_headers):
+            console.print(f"{name}: {report.raw_headers[name]}")
+
     # The header table — one row per rule
     table = Table(
         title = (
@@ -611,6 +618,12 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         action = "store_true",
         help = "Output results as JSON instead of a formatted table.",
     )
+    parser.add_argument(
+        "--verbose",
+        action = "store_true",
+        help = "Print raw response headers above the report.",
+    )
+
     return parser
 
 
@@ -648,7 +661,7 @@ def main() -> int:
         report_dict["grade"] = report.grade
         json.dump(report_dict, sys.stdout)
     else:
-        _render_report(report, console)
+        _render_report(report, console, args.verbose)
 
     if report.grade in ("A", "B"):
         return 0

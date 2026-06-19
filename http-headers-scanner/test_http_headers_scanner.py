@@ -235,6 +235,7 @@ def _make_report(statuses: list[Status]) -> ScanReport:
         final_url = "https://example.com",
         status_code = 200,
         findings = findings,
+        raw_headers = {},
     )
 
 
@@ -341,6 +342,7 @@ def test_scan_mocks_a_clean_response_and_grades_it_correctly() -> None:
     assert report.grade == "A"
     # Every finding should be `ok`
     assert all(f.status == "ok" for f in report.findings)
+    assert report.raw_headers["x-frame-options"] == "DENY"
 
 
 @respx.mock

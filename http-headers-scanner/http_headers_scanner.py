@@ -56,6 +56,8 @@ What this file exposes
 # Standard library: parse command-line flags like `--timeout 5` into
 # a tidy object so we do not have to slice `sys.argv` by hand.
 import argparse
+# Standard library: JSON serialization for machine-readable output
+import json
 # Standard library: regular expressions — we use `re.search` to match
 # header values against rule patterns (e.g. `max-age\s*=\s*[1-9]` for
 # HSTS, which must reject `max-age=0`).
@@ -65,7 +67,7 @@ import re
 import sys
 # Standard library: a decorator that turns a class into a small,
 # immutable data record without writing `__init__` boilerplate.
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 # Standard library: a type hint that pins a value to a small fixed
 # set of strings (here: severity levels like "good"/"warn"). Mypy
 # catches typos.
@@ -604,6 +606,11 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         help =
         "Seconds to wait before giving up on the request (default: 10).",
     )
+    parser.add_argument(
+        "--json",
+        action = "store_true",
+        help = "Output results as JSON instead of a formatted table.",
+    )
     return parser
 
 
@@ -635,7 +642,13 @@ def main() -> int:
         )
         return 2
 
-    _render_report(report, console)
+    if args.json:
+        report_dict = asdict(report)
+        report_dict["score"] = report.score
+        report_dict["grade"] = report.grade
+        json.dump(report_dict, sys.stdout)
+    else:
+        _render_report(report, console)
 
     if report.grade in ("A", "B"):
         return 0

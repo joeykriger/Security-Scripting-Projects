@@ -538,6 +538,16 @@ def gen(
     print(password)
 
 
+@app.command(name="count")
+def count_entries(vault: VaultPath = DEFAULT_VAULT_PATH) -> None:
+    """
+    Print the number of entries in the vault.
+    """
+    master = _prompt_master_password()
+    with _unlock_or_exit(vault, master) as unlocked:
+        print(len(unlocked.entries))
+
+
 @app.command(name = "change-password")
 def change_password(vault: VaultPath = DEFAULT_VAULT_PATH) -> None:
     """

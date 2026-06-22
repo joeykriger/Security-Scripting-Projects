@@ -261,7 +261,11 @@ def _unlock_or_exit(path: Path, master_password: str) -> UnlockedVault:
         raise typer.Exit(code = 1) from None
 
 
-def _render_entry(name: str, entry: Entry) -> Panel:
+def _render_entry(
+    name: str,
+    entry: Entry,
+    show_password: bool = False,
+) -> Panel:
     """
     Format an entry as a rich Panel for terminal display
 
@@ -269,9 +273,10 @@ def _render_entry(name: str, entry: Entry) -> Panel:
     let the terminal handle long values. The password is shown
     verbatim — this is a CLI tool, the user already trusts the screen
     """
+    password = entry.password if show_password else "•" * max(8, len(entry.password))
     body_lines = [
         f"[bold]username[/bold]   {entry.username}",
-        f"[bold]password[/bold]   {entry.password}",
+        f"[bold]password[/bold]   {password}",
     ]
     if entry.url:
         body_lines.append(f"[bold]url[/bold]        {entry.url}")
@@ -378,6 +383,14 @@ def search(
 def get(
     name: Annotated[str,
                     typer.Argument(help = "Entry name to retrieve")],
+    show: Annotated[
+        bool,
+        typer.Option(
+            "--show",
+            "-s",
+            help = "Show the password in the output",
+        ),
+    ] = False,
     vault: VaultPath = DEFAULT_VAULT_PATH,
 ) -> None:
     """
@@ -397,7 +410,7 @@ def get(
         # entry is a frozen Entry instance — its fields remain
         # readable after the vault closes, but we still render
         # inside the block to keep the lifecycle obvious
-        console.print(_render_entry(name, entry))
+        console.print(_render_entry(name, entry, show_password = show))
 
 
 @app.command()

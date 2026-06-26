@@ -62,6 +62,8 @@ from dnslookup.whois_lookup import (
     whois_to_json,
 )
 
+import logging  # CHALLENGE 2
+
 app = typer.Typer(
     name = "dnslookup",
     help =
@@ -167,6 +169,13 @@ def query(
             help = "Request and validate DNSSEC records",
         ),
     ] = False,
+    log_file: Annotated[  # CHALLENGE 2
+        str | None,
+        typer.Option(
+            "--log-file",
+            help = "Write DNS query logs to a file",
+        ),
+    ] = None,
 ) -> None:
     """
     [bold cyan]Query DNS records[/bold cyan] for a domain.
@@ -185,12 +194,18 @@ def query(
             transient = True,
     ) as progress:
         progress.add_task(f"Querying {domain}...", total = None)
+        if log_file:  # CHALLENGE 2
+            handler = logging.FileHandler(log_file)
+            handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+            logging.getLogger("dnslookup").setLevel(logging.INFO)
+            logging.getLogger("dnslookup").addHandler(handler)
         result = asyncio.run(
             lookup(domain,
                    record_types,
                    server,
                    timeout,
-                   dnssec)  # CHALLENGE 1
+                   dnssec,  # CHALLENGE 1
+                   log_file)  # CHALLENGE 2
         )
 
     if json_output:

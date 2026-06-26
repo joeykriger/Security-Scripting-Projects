@@ -49,6 +49,11 @@ import dns.dnssec   # CHALLENGE 1
 import dns.rdataset   # CHALLENGE 1
 import dns.rrset   # CHALLENGE 1
 
+import logging  # CHALLENGE 2
+
+
+logger = logging.getLogger(__name__)  # CHALLENGE 2
+
 
 class RecordType(StrEnum):
     """
@@ -249,6 +254,7 @@ async def lookup(
     nameserver: str | None = None,
     timeout: float = 5.0,
     dnssec: bool = False, # CHALLENGE 1
+    log_file: str | None = None,   # CHALLENGE 2
 ) -> DNSResult:
     """
     Perform DNS lookup for specified record types
@@ -258,6 +264,14 @@ async def lookup(
 
     resolver = create_resolver(nameserver, timeout, dnssec)    # CHALLENGE 1
     result = DNSResult(domain = domain, nameserver = nameserver, dnssec = dnssec)     # CHALLENGE 1
+
+    logger.info(   # CHALLENGE 2
+        "Querying %s types=%s server=%s timeout=%s",
+        domain,
+        [rt.value for rt in record_types],
+        nameserver or "default",
+        timeout,
+    )
 
     start_time = time.perf_counter()
 
@@ -285,6 +299,16 @@ async def lookup(
         result.dnssec_valid = True
 
     result.query_time_ms = (time.perf_counter() - start_time) * 1000
+
+    logger.info(    # CHALLENGE 2
+        "Result %s types=%s server=%s records=%s errors=%s time_ms=%.2f",
+        domain,
+        [rt.value for rt in record_types],
+        nameserver or "default",
+        len(result.records),
+        len(result.errors),
+        result.query_time_ms,
+    )
 
     return result
 

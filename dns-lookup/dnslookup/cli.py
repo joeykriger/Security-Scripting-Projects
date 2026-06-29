@@ -46,6 +46,7 @@ from dnslookup.output import (
     print_summary,
     print_trace_result,
     results_to_json,
+    results_to_csv,  # CHALLENGE 3
     trace_to_json,
 )
 from dnslookup.resolver import (
@@ -162,6 +163,13 @@ def query(
             help = "Output results as JSON",
         ),
     ] = False,
+    csv_output: Annotated[  # CHALLENGE 3
+        bool,
+        typer.Option(
+            "--csv",
+            help = "Output results as CSV",
+        ),
+    ] = False,
     dnssec: Annotated[  # CHALLENGE 1
         bool,
         typer.Option(
@@ -210,6 +218,8 @@ def query(
 
     if json_output:
         console.print(results_to_json(result))
+    elif csv_output:  # CHALLENGE 3
+        console.print(results_to_csv(result))
     else:
         print_header(domain)
         print_dnssec_status(result)  # CHALLENGE 1

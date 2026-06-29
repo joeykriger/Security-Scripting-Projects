@@ -25,6 +25,8 @@ Connects to:
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 from typing import Any
 
@@ -39,6 +41,9 @@ from dnslookup.resolver import (
     RecordType,
     TraceResult,
 )
+
+import csv  # CHALLENGE 3
+import io  # CHALLENGE 3
 
 console = Console()
 
@@ -386,6 +391,32 @@ def results_to_json(results: list[DNSResult] | DNSResult) -> str:
         return json.dumps(data[0], indent = 2)
 
     return json.dumps(data, indent = 2)
+
+
+def results_to_csv(results):  # CHALLENGE 3
+    if isinstance(results, DNSResult):
+        results = [results]
+
+    output = io.StringIO()  # CHALLENGE 3
+    writer = csv.DictWriter(
+        output,
+        fieldnames = ["domain", "record_type", "value", "ttl", "priority", "query_time_ms"],
+    )
+    writer.writeheader()
+
+    for result in results:  # CHALLENGE 3
+        for record in result.records:
+            writer.writerow({
+                "domain": result.domain,
+                "record_type": record.record_type.value,
+                "value": record.value,
+                "ttl": result.timetotal if hasattr(result, 'timetotal') else result.query_time_ms,
+                "priority": record.priority or "",
+                "query_time_ms": round(result.query_time_ms, 2),
+            })
+
+    return output.getvalue()  # CHALLENGE 3
+
 
 
 def trace_to_json(result: TraceResult) -> str:

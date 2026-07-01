@@ -45,13 +45,16 @@ class CaesarCipher:
         """
         Shift a single character by the specified amount while preserving case
         """
-        if char in UPPERCASE_LETTERS:
-            idx = UPPERCASE_LETTERS.index(char)
-            return UPPERCASE_LETTERS[(idx + shift) % ALPHABET_SIZE]
-        if char in LOWERCASE_LETTERS:
-            idx = LOWERCASE_LETTERS.index(char)
-            return LOWERCASE_LETTERS[(idx + shift) % ALPHABET_SIZE]
-        return char
+        if char in UPPERCASE_LETTERS: # CHALLENGE 2
+            alphabet = self.alphabet
+        elif char in LOWERCASE_LETTERS: # CHALLENGE 2
+            alphabet = self.alphabet.lower()
+        else: # CHALLENGE 2
+            return char
+
+        idx = alphabet.index(char.upper() if char.isupper() else char.lower()) # CHALLENGE 2
+        shifted = alphabet[(idx + shift) % len(alphabet)]   # CHALLENGE 2   
+        return shifted.upper() if char.isupper() else shifted # CHALLENGE 2
 
     def encrypt(self, plaintext: str) -> str:
         """

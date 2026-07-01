@@ -190,5 +190,40 @@ def crack(
         raise typer.Exit(code = 1) from None
 
 
+@app.command()  # CHALLENGE 3
+def stats(
+    text: Annotated[
+        str | None,
+        typer.Argument(help = "Text to analyze (or use --input-file or stdin)"),
+    ] = None,
+    input_file: Annotated[
+        Path | None,
+        typer.Option("--input-file",
+                     "-i",
+                     help = "Input file path")] = None,
+) -> None:
+    """
+    Display letter frequency distribution for text as a bar chart
+    """
+    try:
+        input_text = read_input(text, input_file)
+        analyzer = FrequencyAnalyzer()
+        frequencies = analyzer.get_letter_frequencies(input_text)
+        
+        sorted_frequencies = sorted(
+            frequencies.items(),
+            key=lambda item: (-item[1], item[0])
+        )
+        
+        console.print("[bold]Letter Frequencies:[/bold]")
+        for letter, count in sorted_frequencies:
+            bar = "█" * count
+            console.print(f"{letter}: {count} {bar}")
+    
+    except (ValueError, OSError) as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(code = 1) from None
+
+
 if __name__ == "__main__":
     app()

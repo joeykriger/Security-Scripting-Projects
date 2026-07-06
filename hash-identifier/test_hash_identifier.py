@@ -72,7 +72,8 @@ import pytest
 
 # Local: our own module. We pull in the public pieces under test —
 # the prefix-rule table, the result dataclass, and the entry function.
-from hash_identifier import PREFIX_RULES, HashCandidate, identify
+from hash_identifier import _confidence_bucket, PREFIX_RULES, HashCandidate, identify
+
 
 # =============================================================================
 # Prefix matches (high confidence)
@@ -81,6 +82,15 @@ from hash_identifier import PREFIX_RULES, HashCandidate, identify
 # known prefix, we report HIGH confidence. The exact hash payload after
 # the prefix does not matter to identify() — it only inspects the
 # leading characters
+
+# CHALLENGE 3.2
+def test_prefix_match_uses_high_confidence_score() -> None:
+    sample = "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQNQy.uK4Of2T7G"
+    candidates = identify(sample)
+
+    assert candidates
+    assert candidates[0].algorithm == "bcrypt"
+    assert candidates[0].confidence_score == 0.95
 
 
 #TEST-TIGER-128
@@ -109,7 +119,7 @@ def test_bcrypt_prefix_is_recognized() -> None:
     # check. `==` compares for equality
     assert candidates[0].algorithm == "bcrypt"
     # And confidence must be "high" — prefix matches are definitive
-    assert candidates[0].confidence == "high"
+    assert _confidence_bucket(candidates[0].confidence_score) == "high"   # CHALLENGE 3.2
 
 def test_bcrypt_hashcat_mode_is_assigned() -> None:
     sample = "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQNQy.uK4Of2T7G"
@@ -168,7 +178,7 @@ def test_apr1_prefix_is_recognized() -> None:
     sample = "$apr1$rsalt$mp7TYYDvbgvNCJN3JTd6q1"
     candidates = identify(sample)
     assert candidates[0].algorithm == "Apache MD5-crypt"
-    assert candidates[0].confidence == "high"
+    assert _confidence_bucket(candidates[0].confidence_score) == "high"   # CHALLENGE 3.2
 
 
 # =============================================================================
@@ -194,7 +204,7 @@ def test_mysql5_format_is_recognized() -> None:
 
     # MySQL5 is a definitive shape, so we expect HIGH confidence
     assert candidates[0].algorithm == "MySQL5"
-    assert candidates[0].confidence == "high"
+    assert _confidence_bucket(candidates[0].confidence_score) == "high"   # CHALLENGE 3.2
 
 
 def test_mysql5_rejects_lowercase_body() -> None:
@@ -239,7 +249,7 @@ def test_netntlmv2_format_is_recognized() -> None:
 
     # NetNTLMv2 is a definitive shape — HIGH confidence
     assert candidates[0].algorithm == "NetNTLMv2"
-    assert candidates[0].confidence == "high"
+    assert _confidence_bucket(candidates[0].confidence_score) == "high"   # CHALLENGE 3.2
 
 
 def test_netntlmv1_format_is_recognized() -> None:
@@ -257,7 +267,7 @@ def test_netntlmv1_format_is_recognized() -> None:
     sample = "alice::CORP:" + "a" * 48 + ":" + "b" * 48 + ":1122334455667788"
     candidates = identify(sample)
     assert candidates[0].algorithm == "NetNTLMv1"
-    assert candidates[0].confidence == "high"
+    assert _confidence_bucket(candidates[0].confidence_score) == "high"   # CHALLENGE 3.2
 
 
 def test_descrypt_format_is_recognized() -> None:
@@ -279,7 +289,7 @@ def test_descrypt_format_is_recognized() -> None:
     # MEDIUM (not HIGH) confidence because a 13-char `./0-9A-Za-z`
     # string CAN technically be other things (session IDs, random
     # tokens). An honest medium beats a confident false-positive
-    assert candidates[0].confidence == "medium"
+    assert _confidence_bucket(candidates[0].confidence_score) == "medium"
 
 
 # =============================================================================
@@ -288,6 +298,16 @@ def test_descrypt_format_is_recognized() -> None:
 # Step 3 of identify(): when the input is pure hex, length narrows down
 # the algorithm. The FIRST listed algorithm for each length gets
 # medium confidence (the modern default); the rest are low
+
+
+# CHALLENGE 3.2
+def test_hex_length_match_uses_numeric_confidence_score() -> None:
+    sample = "5f4dcc3b5aa765d61d8327deb882cf99"
+    candidates = identify(sample)
+
+    assert candidates
+    assert candidates[0].algorithm == "MD5"
+    assert candidates[0].confidence_score == 0.55
 
 
 def test_mysql323_length_returns_mysql323_first() -> None:
@@ -312,7 +332,7 @@ def test_mysql323_length_returns_mysql323_first() -> None:
     assert candidates[0].algorithm == "MySQL323"
     # MEDIUM confidence: length alone is suggestive but cannot rule
     # out CRC-64 with certainty without seeing the surrounding context
-    assert candidates[0].confidence == "medium"
+    assert _confidence_bucket(candidates[0].confidence_score) == "medium"
 
 
 def test_md5_length_returns_md5_first() -> None:
@@ -332,7 +352,7 @@ def test_md5_length_returns_md5_first() -> None:
     assert candidates[0].algorithm == "MD5"
     # And we report MEDIUM confidence — length alone is suggestive
     # but not definitive (no prefix to confirm)
-    assert candidates[0].confidence == "medium"
+    assert _confidence_bucket(candidates[0].confidence_score) == "medium"
 
     # NTLM should appear in the candidate list as a less-likely option.
     # We pull just the algorithm names into a list using a comprehension,
@@ -370,6 +390,16 @@ def test_sha1_length_returns_sha1_first() -> None:
 # =============================================================================
 # Always test the boring edge cases. Empty inputs, whitespace-only,
 # garbage. These caused real bugs in real codebases more than once
+
+
+# CHALLENGE 3.2
+def test_url_is_reported_as_not_a_hash_with_low_score() -> None:
+    sample = "https://example.com"
+    candidates = identify(sample)
+
+    assert candidates
+    assert candidates[0].algorithm == "URL (not a hash)"
+    assert candidates[0].confidence_score == 0.30
 
 
 def test_empty_input_returns_no_candidates() -> None:
@@ -437,7 +467,7 @@ def test_unknown_phc_string_falls_back_to_generic() -> None:
     assert "pbkdf2-sha512" in candidates[0].algorithm
     # LOW confidence because we matched on shape only, not on a
     # specific rule that would let us confirm the algorithm
-    assert candidates[0].confidence == "low"
+    assert _confidence_bucket(candidates[0].confidence_score) == "low"
 
 
 def test_jwt_input_is_called_out_as_not_a_hash() -> None:
@@ -460,7 +490,7 @@ def test_jwt_input_is_called_out_as_not_a_hash() -> None:
     assert "JWT" in candidates[0].algorithm
     # LOW confidence is honest: we are not 100% sure this is a JWT,
     # we are 100% sure it starts with `eyJ` and JWTs start with `eyJ`
-    assert candidates[0].confidence == "low"
+    assert _confidence_bucket(candidates[0].confidence_score) == "low"
 
 
 def test_base64_blob_is_called_out_as_not_a_hash() -> None:
@@ -494,7 +524,7 @@ def test_0x_hex_input_is_called_out_as_not_a_hash() -> None:
 
     assert candidates
     assert "0x" in candidates[0].algorithm or "0x hex" in candidates[0].algorithm
-    assert candidates[0].confidence == "low"
+    assert _confidence_bucket(candidates[0].confidence_score) == "low"
 
 def test_base58_input_is_called_out_as_not_a_hash() -> None:
     sample = "1BoatSLRHtKNngkdXEeobR76b53LETtpyT"
@@ -502,7 +532,7 @@ def test_base58_input_is_called_out_as_not_a_hash() -> None:
 
     assert candidates
     assert "Base58" in candidates[0].algorithm
-    assert candidates[0].confidence == "low"
+    assert _confidence_bucket(candidates[0].confidence_score) == "low"
 
 def test_base32_input_is_called_out_as_not_a_hash() -> None:
     sample = "JBSWY3DPEHPK3PXP"
@@ -510,7 +540,7 @@ def test_base32_input_is_called_out_as_not_a_hash() -> None:
 
     assert candidates
     assert "Base32" in candidates[0].algorithm
-    assert candidates[0].confidence == "low"
+    assert _confidence_bucket(candidates[0].confidence_score) == "low"
 
 # =============================================================================
 # HashCandidate is immutable
@@ -594,4 +624,4 @@ def test_every_prefix_rule_is_recognized_with_high_confidence(
     # so the failure is debuggable at a glance
     assert candidates, f"no candidates returned for prefix `{prefix}`"
     assert candidates[0].algorithm == algorithm
-    assert candidates[0].confidence == "high"
+    assert _confidence_bucket(candidates[0].confidence_score) == "high"   # CHALLENGE 3.2

@@ -96,6 +96,14 @@ Confidence = Literal["high", "medium", "low"]
 # =============================================================================
 
 
+def _score_from_confidence(confidence: str) -> float:
+    return {
+        "high": 0.95,
+        "medium": 0.55,
+        "low": 0.30,
+    }[confidence]
+
+
 @dataclass(frozen = True, slots = True)
 class HashCandidate:
     """
@@ -118,9 +126,31 @@ class HashCandidate:
         the output debuggable — the user can see WHY each guess fired
     """
     algorithm: str
-    confidence: Confidence
+    confidence_score: float
     reason: str
     hashcat_mode: int | None = None # Optional field for hashcat mode number
+
+    def __init__(
+        self,
+        algorithm: str,
+        confidence_score: float | None = None,
+        reason: str = "",
+        hashcat_mode: int | None = None,
+        confidence: str | None = None,
+    ) -> None:
+        if confidence is not None:
+            confidence_score = _score_from_confidence(confidence)
+        if confidence_score is None:
+            raise TypeError("confidence_score is required")
+
+        object.__setattr__(self, "algorithm", algorithm)
+        object.__setattr__(self, "confidence_score", confidence_score)
+        object.__setattr__(self, "reason", reason)
+        object.__setattr__(self, "hashcat_mode", hashcat_mode)
+
+    @property
+    def confidence(self) -> str:
+        return _confidence_bucket(self.confidence_score)
 
 
 HASHCAT_MODES = {
@@ -255,6 +285,15 @@ HEX_LENGTH_RULES: dict[int, list[str]] = {
 # =============================================================================
 # Helpers
 # =============================================================================
+
+
+# CHALLENGE 3.2 
+def _confidence_bucket(score: float) -> str:
+    if score > 0.8:
+        return "high"
+    if score >= 0.5:
+        return "medium"
+    return "low"
 
 
 def _is_hex(text: str) -> bool:
@@ -452,7 +491,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
             return [
                 HashCandidate(
                     algorithm = algorithm,
-                    confidence = "high",
+                    confidence_score = 0.95,    # CHALLENGE 3.2
                     reason = f"prefix `{prefix}` — {note}",
                     hashcat_mode = HASHCAT_MODES.get(algorithm),
                 )
@@ -484,7 +523,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
             return [
                 HashCandidate(
                     algorithm = "NetNTLMv2",
-                    confidence = "high",
+                    confidence_score = 0.95,    #CHALLENGE 3.2
                     reason =
                     "user::domain:challenge:hmac(32 hex):blob shape",
                     hashcat_mode = HASHCAT_MODES.get(algorithm),
@@ -497,7 +536,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
             return [
                 HashCandidate(
                     algorithm = "NetNTLMv1",
-                    confidence = "high",
+                    confidence_score = 0.95,    #CHALLENGE 3.2
                     reason =
                     "user::domain:lm(48 hex):nt(48 hex):challenge shape",
                     hashcat_mode = HASHCAT_MODES.get(algorithm),
@@ -509,7 +548,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
         return [
             HashCandidate(
                 algorithm = "MySQL5",
-                confidence = "high",
+                confidence_score = 0.95,    #CHALLENGE 3.2
                 reason =
                 "starts with `*` followed by 40 uppercase hex chars",
                 hashcat_mode = HASHCAT_MODES.get(algorithm),
@@ -523,7 +562,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
         return [
             HashCandidate(
                 algorithm = "DES crypt",
-                confidence = "medium",
+                confidence_score = 0.55,    #CHALLENGE 3.2
                 reason =
                 "13 chars in `./0-9A-Za-z` — legacy /etc/passwd format",
                 hashcat_mode = HASHCAT_MODES.get(algorithm),
@@ -538,16 +577,12 @@ def identify(raw_input: str) -> list[HashCandidate]:
             # The first listed algorithm for each length is the modern
             # default and gets MEDIUM confidence. The rest are still
             # possible but less common in 2026 — LOW confidence
-            confidence: Confidence = "medium" if index == 0 else "low"
-            label = (
-                "most likely candidate at this length"
-                if index == 0 else "also possible at this length"
-            )
+            score = 0.55 / (index + 1)  # CHALLENGE 3.2
             candidates.append(
                 HashCandidate(
                     algorithm = algorithm,
-                    confidence = confidence,
-                    reason = f"{len(text)} hex chars — {label}",
+                    confidence_score = score,  # CHALLENGE 3.2
+                    reason = f"{len(text)} hex chars — " + ("most likely candidate at this length" if index == 0 else "also possible at this length"),  # CHALLENGE 3.2
                     hashcat_mode = HASHCAT_MODES.get(algorithm),
                 )
             )
@@ -580,7 +615,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
                 return [
                     HashCandidate(
                         algorithm = f"PHC string ({algo_name})",
-                        confidence = "low",
+                        confidence_score = 0.30,    #CHALLENGE 3.2
                         reason =
                         f"`${algo_name}$...` shape — generic PHC, no specific rule",
                         hashcat_mode = HASHCAT_MODES.get(algorithm),
@@ -601,7 +636,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
         return [
             HashCandidate(
                 algorithm = "JWT (not a hash)",
-                confidence = "low",
+                confidence_score = 0.30,  # CHALLENGE 3.2
                 reason =
                 "leading `eyJ` is base64 of `{\"` — JWT, not a hash",
                 hashcat_mode = HASHCAT_MODES.get("JWT (not a hash)"),
@@ -612,7 +647,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
         return [
             HashCandidate(
                 algorithm = "URL (not a hash)",
-                confidence = "low",
+                confidence_score = 0.30,  # CHALLENGE 3.2
                 reason = "starts with http:// or https://",
                 hashcat_mode = HASHCAT_MODES.get("URL (not a hash)"),
             )
@@ -622,7 +657,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
         return [
             HashCandidate(
                 algorithm = "0x hex (not a hash)",
-                confidence = "low",
+                confidence_score = 0.30,  # CHALLENGE 3.2
                 reason = "starts with 0x followed by valid hex digits",
                 hashcat_mode = HASHCAT_MODES.get("0x hex (not a hash)"),
             )
@@ -632,7 +667,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
         return [
             HashCandidate(
                 algorithm = "Base32 data (not a hash)",
-                confidence = "low",
+                confidence_score = 0.30,   # CHALLENGE 3.2
                 reason = "all chars are valid Base32 alphabet",
                 hashcat_mode = HASHCAT_MODES.get("Base32 data (not a hash)"),
             )
@@ -642,7 +677,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
         return [
             HashCandidate(
                 algorithm = "Base58 data (not a hash)",
-                confidence = "low",
+                confidence_score = 0.30,  # CHALLENGE 3.2
                 reason = "all chars are valid Base58 alphabet",
                 hashcat_mode = HASHCAT_MODES.get("Base58 data (not a hash)"),
             )
@@ -656,7 +691,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
         return [
             HashCandidate(
                 algorithm = "Base64 blob (not a hash)",
-                confidence = "low",
+                confidence_score = 0.30,  # CHALLENGE 3.2
                 reason = "contains base64-only chars (`+`, `/`, `=`)",
                 hashcat_mode = HASHCAT_MODES.get("Base64 blob (not a hash)"),
             )
@@ -700,7 +735,7 @@ def _build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-f", "--file",
         type = argparse.FileType("r"),
-        help = "Read hashes frmo this file, one per line.",
+        help = "Read hashes from this file, one per line.",
     )
 
     # TEST
@@ -750,18 +785,19 @@ def _render_table(
     # the no-match error message printed elsewhere in main(). Painting
     # "low" in red would make three weak-but-valid guesses look like
     # three errors at a glance — broken visual hierarchy
-    confidence_colors: dict[Confidence,
-                            str] = {
-                                "high": "green",
-                                "medium": "yellow",
-                                "low": "cyan",
-                            }
+
+    # CHALLENGE 3
     for candidate in candidates:
-        color = confidence_colors[candidate.confidence]
+        bucket = _confidence_bucket(candidate.confidence_score)
+        color = {
+            "high": "green",
+            "medium": "yellow",
+            "low": "cyan",
+        }[bucket]
         table.add_row(
             candidate.algorithm,
-            f"[{color}]{candidate.hashcat_mode}[/{color}]",
-            candidate.confidence,
+            f"[{color}]{bucket}[/{color}]",
+            candidate.reason,
         )
     console.print(table)
 
@@ -774,7 +810,10 @@ def _render_split_table(record, console):
         table.add_column("Confidence")
         for index, (field, candidates, kind) in enumerate(record):
             top = candidates[0].algorithm if candidates else "-"
-            confidence = candidates[0].confidence if candidates else "-"
+            confidence = (    #CHALLENGE 3.2
+                _confidence_bucket(candidates[0].confidence_score) 
+                if candidates else "-"
+            )
             table.add_row(str(index), field, kind, top, confidence)
         console.print(table)
 
@@ -820,7 +859,6 @@ def main() -> int:
         json_ready_data = [dataclasses.asdict(candidate) for candidate in candidates]
         print(json.dumps(json_ready_data, indent=2))
     else:
-
 	    if not candidates:
 	      	 # `[red]...[/red]` is rich's inline color markup
 	        console.print(
@@ -828,7 +866,7 @@ def main() -> int:
 	            "Input did not match any known prefix, special format, "
 	            "or hex length."
 	        )
-	    return 1
+	        return 1
 
 	    # Trim to the requested top-N
 	    trimmed = candidates[: args.top]
@@ -836,7 +874,7 @@ def main() -> int:
 	
 	    # Helpful nudge — point the user at the cracker once they know
 	    # what algorithm to target. Foundations tier is meant to chain
-	    if trimmed[0].confidence == "high":
+	    if _confidence_bucket(trimmed[0].confidence_score) == "high":    #CHALLENGE 3.2
 	        console.print(
 	            "\n[dim]Next step: try the matching cracker mode "
 	            "(see ../../beginner/hash-cracker).[/dim]"

@@ -129,6 +129,15 @@ def test_bcrypt_hashcat_mode_is_assigned() -> None:
     assert candidates[0].algorithm == "bcrypt"
     assert candidates[0].hashcat_mode == 3200
 
+# CHALLENGE 3.3
+def test_bcrypt_difficulty_is_reported() -> None:
+    sample = "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQNQy.uK4Of2T7G"
+    candidates = identify(sample)
+
+    assert candidates
+    assert candidates[0].algorithm == "bcrypt"
+    assert candidates[0].crack_difficulty == "hard"
+
 def TEST_OLDER_ATLASSIAN_prefix_is_recognized() -> None:
     """
     Argon2id PHC strings begin with `$argon2id$`

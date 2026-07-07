@@ -128,6 +128,7 @@ class HashCandidate:
     algorithm: str
     confidence_score: float
     reason: str
+    crack_difficulty: str = "moderate" # CHALLENGE 3.3
     hashcat_mode: int | None = None # Optional field for hashcat mode number
 
     def __init__(
@@ -135,6 +136,7 @@ class HashCandidate:
         algorithm: str,
         confidence_score: float | None = None,
         reason: str = "",
+        crack_difficulty: str = "moderate", # CHALLENGE 3.3
         hashcat_mode: int | None = None,
         confidence: str | None = None,
     ) -> None:
@@ -146,6 +148,7 @@ class HashCandidate:
         object.__setattr__(self, "algorithm", algorithm)
         object.__setattr__(self, "confidence_score", confidence_score)
         object.__setattr__(self, "reason", reason)
+        object.__setattr__(self, "crack_difficulty", crack_difficulty) # CHALLENGE 3.3
         object.__setattr__(self, "hashcat_mode", hashcat_mode)
 
     @property
@@ -285,6 +288,38 @@ HEX_LENGTH_RULES: dict[int, list[str]] = {
 # =============================================================================
 # Helpers
 # =============================================================================
+
+
+# CHALLENGE 3.3
+def _estimate_crack_difficulty(algorithm: str, raw_input: str) -> str:
+    if algorithm == "bcrypt":
+        try:
+            parts = raw_input.split("$")
+            cost = int(parts[2])
+        except (IndexError, ValueError):
+            cost = 12
+
+        if cost <= 4:
+            return "moderate"
+        if cost < 12:
+            return "hard"
+        if cost >= 14:
+            return "very hard"
+        return "hard"
+    
+    if algorithm == "Argon2id":
+        return "very hard"
+    
+    if algorithm in {"MD5", "SHA-1"}:
+        return "trivial"
+    
+    if algorithm in {"SHA-256", "SHA-512", "SHA-512 crypt", "SHA-256 crypt"}:
+        return "moderate"
+    
+    if algorithm in {"scrypt", "yescrypt"}:
+        return "hard"
+    
+    return "moderate"
 
 
 # CHALLENGE 3.2 
@@ -493,6 +528,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
                     algorithm = algorithm,
                     confidence_score = 0.95,    # CHALLENGE 3.2
                     reason = f"prefix `{prefix}` — {note}",
+                    crack_difficulty = _estimate_crack_difficulty(algorithm, text), # CHALLENGE 3.3
                     hashcat_mode = HASHCAT_MODES.get(algorithm),
                 )
             ]
@@ -526,6 +562,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
                     confidence_score = 0.95,    #CHALLENGE 3.2
                     reason =
                     "user::domain:challenge:hmac(32 hex):blob shape",
+                    crack_difficulty = _estimate_crack_difficulty(algorithm, text), # CHALLENGE 3.3
                     hashcat_mode = HASHCAT_MODES.get(algorithm),
                 )
             ]
@@ -539,6 +576,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
                     confidence_score = 0.95,    #CHALLENGE 3.2
                     reason =
                     "user::domain:lm(48 hex):nt(48 hex):challenge shape",
+                    crack_difficulty = _estimate_crack_difficulty(algorithm, text), # CHALLENGE 3.3
                     hashcat_mode = HASHCAT_MODES.get(algorithm),
                 )
             ]
@@ -551,6 +589,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
                 confidence_score = 0.95,    #CHALLENGE 3.2
                 reason =
                 "starts with `*` followed by 40 uppercase hex chars",
+                crack_difficulty = _estimate_crack_difficulty(algorithm, text), #CHALLENGE 3.3
                 hashcat_mode = HASHCAT_MODES.get(algorithm),
             )
         ]
@@ -565,6 +604,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
                 confidence_score = 0.55,    #CHALLENGE 3.2
                 reason =
                 "13 chars in `./0-9A-Za-z` — legacy /etc/passwd format",
+                crack_difficulty = _estimate_crack_difficulty(algorithm, text), # CHALLENGE 3.3
                 hashcat_mode = HASHCAT_MODES.get(algorithm),
             )
         ]
@@ -583,6 +623,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
                     algorithm = algorithm,
                     confidence_score = score,  # CHALLENGE 3.2
                     reason = f"{len(text)} hex chars — " + ("most likely candidate at this length" if index == 0 else "also possible at this length"),  # CHALLENGE 3.2
+                    crack_difficulty = _estimate_crack_difficulty(algorithm, text), # CHALLENGE 3.3
                     hashcat_mode = HASHCAT_MODES.get(algorithm),
                 )
             )
@@ -618,6 +659,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
                         confidence_score = 0.30,    #CHALLENGE 3.2
                         reason =
                         f"`${algo_name}$...` shape — generic PHC, no specific rule",
+                        crack_difficulty = _estimate_crack_difficulty(algorithm, text), # CHALLENGE 3.3
                         hashcat_mode = HASHCAT_MODES.get(algorithm),
                     )
                 ]
@@ -639,6 +681,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
                 confidence_score = 0.30,  # CHALLENGE 3.2
                 reason =
                 "leading `eyJ` is base64 of `{\"` — JWT, not a hash",
+                crack_difficulty = _estimate_crack_difficulty(algorithm, text), # CHALLENGE 3.3
                 hashcat_mode = HASHCAT_MODES.get("JWT (not a hash)"),
                 )
         ]
@@ -649,6 +692,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
                 algorithm = "URL (not a hash)",
                 confidence_score = 0.30,  # CHALLENGE 3.2
                 reason = "starts with http:// or https://",
+                crack_difficulty = _estimate_crack_difficulty(algorithm, text), # CHALLENGE 3.3
                 hashcat_mode = HASHCAT_MODES.get("URL (not a hash)"),
             )
         ]
@@ -659,6 +703,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
                 algorithm = "0x hex (not a hash)",
                 confidence_score = 0.30,  # CHALLENGE 3.2
                 reason = "starts with 0x followed by valid hex digits",
+                crack_difficulty = _estimate_crack_difficulty(algorithm, text), # CHALLENGE 3.3
                 hashcat_mode = HASHCAT_MODES.get("0x hex (not a hash)"),
             )
         ]
@@ -669,6 +714,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
                 algorithm = "Base32 data (not a hash)",
                 confidence_score = 0.30,   # CHALLENGE 3.2
                 reason = "all chars are valid Base32 alphabet",
+                crack_difficulty = _estimate_crack_difficulty(algorithm, text), # CHALLENGE 3.3
                 hashcat_mode = HASHCAT_MODES.get("Base32 data (not a hash)"),
             )
         ]
@@ -679,6 +725,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
                 algorithm = "Base58 data (not a hash)",
                 confidence_score = 0.30,  # CHALLENGE 3.2
                 reason = "all chars are valid Base58 alphabet",
+                crack_difficulty = _estimate_crack_difficulty(algorithm, text), # CHALLENGE 3.3
                 hashcat_mode = HASHCAT_MODES.get("Base58 data (not a hash)"),
             )
         ]  
@@ -693,6 +740,7 @@ def identify(raw_input: str) -> list[HashCandidate]:
                 algorithm = "Base64 blob (not a hash)",
                 confidence_score = 0.30,  # CHALLENGE 3.2
                 reason = "contains base64-only chars (`+`, `/`, `=`)",
+                crack_difficulty = _estimate_crack_difficulty(algorithm, text), # CHALLENGE 3.3
                 hashcat_mode = HASHCAT_MODES.get("Base64 blob (not a hash)"),
             )
         ]
@@ -777,6 +825,7 @@ def _render_table(
     )
     table.add_column("algorithm", style = "bold white", no_wrap = True)
     table.add_column("confidence", no_wrap = True)
+    table.add_column("difficulty", no_wrap = True)   # CHALLENGE 3.3
     table.add_column("reason", style = "dim")
 
     # Color confidence levels so the eye can scan them quickly.
@@ -786,7 +835,7 @@ def _render_table(
     # "low" in red would make three weak-but-valid guesses look like
     # three errors at a glance — broken visual hierarchy
 
-    # CHALLENGE 3
+    # CHALLENGE 3.2
     for candidate in candidates:
         bucket = _confidence_bucket(candidate.confidence_score)
         color = {
@@ -797,6 +846,7 @@ def _render_table(
         table.add_row(
             candidate.algorithm,
             f"[{color}]{bucket}[/{color}]",
+            candidate.crack_difficulty,   # CHALLENGE 3.3
             candidate.reason,
         )
     console.print(table)
@@ -845,10 +895,6 @@ def main() -> int:
 
     candidates = identify(args.hash)
 
-    if not args.json:
-        console.rule(f"[bold cyan]Hash: {h}[/bold cyan]")
-        _render_table(h, candidates[:args.top], console)
-
     if args.split:
         record = identify_record(raw_input)
         _render_split_table(record, console)
@@ -859,28 +905,29 @@ def main() -> int:
         json_ready_data = [dataclasses.asdict(candidate) for candidate in candidates]
         print(json.dumps(json_ready_data, indent=2))
     else:
-	    if not candidates:
-	      	 # `[red]...[/red]` is rich's inline color markup
-	        console.print(
-	            "[red]No identification possible.[/red] "
-	            "Input did not match any known prefix, special format, "
-	            "or hex length."
-	        )
-	        return 1
+        if not candidates:
+            # `[red]...[/red]` is rich's inline color markup
+            console.print(
+                "[red]No identification possible.[/red] "
+                "Input did not match any known prefix, special format, "
+                "or hex length."
+            )
+            return 1
 
-	    # Trim to the requested top-N
-	    trimmed = candidates[: args.top]
-	    _render_table(args.hash, trimmed, console)
-	
-	    # Helpful nudge — point the user at the cracker once they know
-	    # what algorithm to target. Foundations tier is meant to chain
-	    if _confidence_bucket(trimmed[0].confidence_score) == "high":    #CHALLENGE 3.2
-	        console.print(
-	            "\n[dim]Next step: try the matching cracker mode "
-	            "(see ../../beginner/hash-cracker).[/dim]"
-	        )
-	
-	    return 0
+        # Trim to the requested top-N
+        trimmed = candidates[: args.top]
+        console.rule(f"[bold cyan]Hash: {args.hash}[/bold cyan]")
+        _render_table(args.hash, trimmed, console)
+
+        # Helpful nudge — point the user at the cracker once they know
+        # what algorithm to target. Foundations tier is meant to chain
+        if _confidence_bucket(trimmed[0].confidence_score) == "high":
+            console.print(
+                "\n[dim]Next step: try the matching cracker mode "
+                "(see ../../beginner/hash-cracker).[/dim]"
+            )
+
+        return 0
 
 
 	# Standard "if invoked directly as a script" guard — lets the file be

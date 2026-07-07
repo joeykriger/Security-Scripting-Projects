@@ -1,0 +1,16 @@
+Challenge 4.2 performance results
+
+Benchmark file: perf_batch_small.txt (400 lines)
+
+Tools and measured runtime:
+- repo_tool (`just run -- "$line"` loop): 184.77s
+- hashid (`uv run python -m hashid "$line"` loop): 103.92s
+- name-that-hash (`uv run python -m name_that_hash --file perf_batch_small.txt`): 0.92s
+
+Additional benchmark:
+- repo_tool on perf_batch.txt (8000 lines): 30m3.209s
+
+Notes:
+- The `just run -- "$line"` loop completed successfully; it was slow but did not hang.
+- `name-that-hash` is fastest because it supports direct file-based batch input.
+- `hashid` is faster than the `just` wrapper loop for this small benchmark.

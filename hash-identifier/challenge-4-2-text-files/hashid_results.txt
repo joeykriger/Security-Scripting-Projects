@@ -1,0 +1,59 @@
+]633;E;IFS= read -r line;3d0e36a9-2440-4dcb-bb16-fd1f8146c41d]633;C
+=== INPUT: 5f4dcc3b5aa765d61d8327deb882cf99 ===
+Analyzing '5f4dcc3b5aa765d61d8327deb882cf99'
+[+] MD2 
+[+] MD5 
+[+] MD4 
+[+] Double MD5 
+[+] LM 
+[+] RIPEMD-128 
+[+] Haval-128 
+[+] Tiger-128 
+[+] Skein-256(128) 
+[+] Skein-512(128) 
+[+] Lotus Notes/Domino 5 
+[+] Skype 
+[+] Snefru-128 
+[+] NTLM 
+[+] Domain Cached Credentials 
+[+] Domain Cached Credentials 2 
+[+] DNSSEC(NSEC3) 
+[+] RAdmin v2.x 
+
+=== INPUT: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ===
+Analyzing 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+[+] Snefru-256 
+[+] SHA-256 
+[+] RIPEMD-256 
+[+] Haval-256 
+[+] GOST R 34.11-94 
+[+] GOST CryptoPro S-Box 
+[+] SHA3-256 
+[+] Skein-256 
+[+] Skein-512(256) 
+
+=== INPUT: $2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQNQy.uK4Of2T7G.VHvgvWK ===
+Analyzing '$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQNQy.uK4Of2T7G.VHvgvWK'
+[+] Unknown hash
+
+=== INPUT: *A4B6157319038724E3560894F7F932C8886EBFCF ===
+Analyzing '*A4B6157319038724E3560894F7F932C8886EBFCF'
+[+] MySQL5.x 
+[+] MySQL4.1 
+
+=== INPUT: not-a-hash ===
+Analyzing 'not-a-hash'
+[+] Unknown hash
+
+=== INPUT: http://example.com ===
+Analyzing 'http://example.com'
+[+] Unknown hash
+
+=== INPUT: 123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz ===
+Analyzing '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+[+] Unknown hash
+
+=== INPUT: JBSWY3DPEHPK3PXP ===
+Analyzing 'JBSWY3DPEHPK3PXP'
+[+] Cisco-PIX(MD5) 
+[+] Cisco-ASA(MD5) 

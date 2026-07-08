@@ -454,6 +454,39 @@ def test_input_is_trimmed_of_whitespace() -> None:
 # because shape alone is a weaker signal than a known prefix
 
 
+# CHALLENGE 5.1
+def test_md5_and_ntlm_are_indistinguishable_by_structure():
+    s = "5f4dcc3b5aa765d61d8327deb882cf99" # 32 hex
+    candidates = identify(s)
+    # assert top candidates include both "MD5" and "NTLM" (or that multiple equal confidences exist)
+    assert any(c.algorithm == "MD5" for c in candidates)
+    assert any(c.algorithm == "NTLM" for c in candidates)
+
+
+# CHALLENGE 5.1
+def test_truncated_sha256_is_not_unambiguously_distinguished() -> None:
+    """
+    A 32-hex string can be a truncated SHA-256, but structure alone
+    still makes the tool lean toward MD5-like candidates.
+    """
+    sample = "a" * 32
+    candidates = identify(sample)
+
+    assert candidates
+    assert candidates[0].algorithm == "MD5"
+    assert any(c.algorithm == "NTLM" for c in candidates)
+
+
+# CHALLENGE 5.1
+def test_base64_blob_is_low_confidence_not_a_hash() -> None:
+    sample = "VGhpcyBpcyBub3QgYSBoYXNoLCBpdHMgYmFzZTY0Lg=="
+    candidates = identify(sample)
+
+    assert candidates
+    assert "Base64" in candidates[0].algorithm
+    assert _confidence_bucket(candidates[0].confidence_score) == "low"
+
+
 def test_unknown_phc_string_falls_back_to_generic() -> None:
     """
     A PHC string from an algorithm we don't have a specific rule for

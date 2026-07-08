@@ -1,0 +1,4 @@
+This is a normal line.
+5f4dcc3b5aa765d61d8327deb882cf99
+Another normal line.
+$2b$12$EixZaYVK1fsbw1ZfbX3OXeoH0Mun614O6leSEv4T1kqllVishnJm # pragma: allow-hash

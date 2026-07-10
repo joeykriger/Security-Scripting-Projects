@@ -603,8 +603,9 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "url",
-        help = "Full URL to scan (must include http:// or https://).",
+        "urls",    # CHALLENGE 4
+        nargs = "+",    # CHALLENGE 4
+        help = "One or more full URL to scan (must include http:// or https://).",
     )
     parser.add_argument(
         "--timeout",
@@ -643,29 +644,46 @@ def main() -> int:
     args = parser.parse_args()
     console = Console()
 
+    reports = []    # CHALLENGE 4
+
     # Catch network errors here so the user sees a clean message
     # instead of a raw traceback. We let httpx's own message bubble
     # through after our prefix — the underlying error usually has
     # useful detail (DNS failure, connection refused, etc.)
-    try:
-        report = scan(args.url, timeout = args.timeout)
-    except httpx.RequestError as exc:
-        console.print(
-            f"[red]Request failed:[/red] {type(exc).__name__}: {exc}"
-        )
-        return 2
+    for target in args.urls:    # CHALLENGE 4
+        try:
+            report = scan(target, timeout = args.timeout)
+        except httpx.RequestError as exc:
+            console.print(
+                f"[red]Request failed[/red] for {target}: {exc}"    # CHALLENGE 4
+            )
+            return 2
+        
+        reports.append(report)    # CHALLENGE 4
 
-    if args.json:
-        report_dict = asdict(report)
-        report_dict["score"] = report.score
-        report_dict["grade"] = report.grade
-        json.dump(report_dict, sys.stdout)
-    else:
-        _render_report(report, console, args.verbose)
+    for report in reports:    # CHALLENGE 4
+        if args.json:
+            report_dict = asdict(report)
+            report_dict["score"] = report.score
+            report_dict["grade"] = report.grade
+            json.dump(report_dict, sys.stdout)
+        else:
+            _render_report(report, console, args.verbose)
+            console.print()
 
-    if report.grade in ("A", "B"):
+    worst_grade = "A"    # CHALLENGE 4
+    for report in reports:    # CHALLENGE 4
+        if report.grade == "F":
+            worst_grade = "F"
+            break
+        if report.grade == "D":
+            worst_grade = "D"
+        elif report.grade == "C" and worst_grade != "D":
+            worst_grade = "C"
+
+    if worst_grade in ("A", "B"):    # CHALLENGE 4
         return 0
-    if report.grade in ("C", "D"):
+    if worst_grade in ("C", "D"):    # CHALLENGE 4
         return 1
     return 2
 

@@ -63,6 +63,7 @@ from http_headers_scanner import (
     Status,
     evaluate_header,
     scan,
+    _grade_rank,    # CHALLENGE 5
 )
 
 # =============================================================================
@@ -301,6 +302,11 @@ def test_grade_threshold_b_with_three_mediums() -> None:
     report = _make_report(statuses)
     assert 80 <= report.score < 90
     assert report.grade == "B"
+
+
+def test_grade_rank_orders_grades() -> None:  # CHALLENGE 5
+    assert _grade_rank("A") > _grade_rank("B")
+    assert _grade_rank("C") > _grade_rank("D")
 
 
 # =============================================================================

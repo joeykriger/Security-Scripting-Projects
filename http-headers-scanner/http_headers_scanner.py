@@ -520,6 +520,16 @@ GRADE_COLORS: dict[str,
                        "F": "bright_red",
                    }
 
+GRADE_RANK: dict[str, int] = {  # CHALLENGE 5
+    "A": 5,
+    "B": 4,
+    "C": 3,
+    "D": 2,
+    "F": 1,
+}
+
+def _grade_rank(grade: str) -> int:  # CHALLENGE 5
+    return GRADE_RANK[grade]
 
 def _render_report(report: ScanReport, console: Console, verbose: bool = False) -> None:
     """
@@ -624,6 +634,12 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         action = "store_true",
         help = "Print raw response headers above the report.",
     )
+    parser.add_argument(    # CHALLENGE 5
+        "--min-grade",
+        choices = ["A", "B", "C", "D", "F"],
+        default = "C",
+        help = "Lowest grade that should still exit successfully (default: C).",
+    )
 
     return parser
 
@@ -671,21 +687,16 @@ def main() -> int:
             _render_report(report, console, args.verbose)
             console.print()
 
-    worst_grade = "A"    # CHALLENGE 4
-    for report in reports:    # CHALLENGE 4
-        if report.grade == "F":
-            worst_grade = "F"
-            break
-        if report.grade == "D":
-            worst_grade = "D"
-        elif report.grade == "C" and worst_grade != "D":
-            worst_grade = "C"
+    # CHALLENGE 5: compare each report's grade against the user-supplied
+    # `--min-grade` threshold. If any report is below the threshold,
+    # return 1. Network errors already return 2 earlier.
+    threshold_rank = _grade_rank(args.min_grade)
 
-    if worst_grade in ("A", "B"):    # CHALLENGE 4
-        return 0
-    if worst_grade in ("C", "D"):    # CHALLENGE 4
-        return 1
-    return 2
+    for report in reports:  # CHALLENGE 5
+        if _grade_rank(report.grade) < threshold_rank:
+            return 1
+
+    return 0  # all reports met or exceeded the threshold
 
 
 # Standard "if invoked directly as a script" guard — lets the file be

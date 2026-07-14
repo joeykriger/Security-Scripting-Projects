@@ -86,6 +86,16 @@ from rich.panel import Panel
 # header finding with its severity.
 from rich.table import Table
 
+# CHALLENGE 6
+import hashlib
+import time
+from pathlib import Path
+
+# CHALLENGE 6
+CACHE_DIR = Path.home() / ".cache" / "http-headers-scanner"
+CACHE_TTL_SECONDS = 60 * 60
+
+
 # =============================================================================
 # Severity type — three valid values
 # =============================================================================
@@ -443,6 +453,7 @@ def scan(
     *,
     timeout: float = 10.0,
     user_agent: str = DEFAULT_USER_AGENT,
+    no_cache: bool = False,  # CHALLENGE 6
 ) -> ScanReport:
     """
     Fetch `url` once and grade its response headers
@@ -471,6 +482,11 @@ def scan(
         On DNS failure, connection refusal, timeout, etc. The CLI
         catches these to print a clean error message
     """
+    if not no_cache: # CHALLENGE 6
+        cached = _load_cached_report(url)
+        if cached is not None:
+            return cached
+
     # follow_redirects=True means http://example.com → https://example.com
     # is followed automatically. We grade the FINAL URL, not the first
     # one, because that is the one users actually see
@@ -489,13 +505,16 @@ def scan(
     # cleaner than a for-loop with .append() here
     findings = [evaluate_header(rule, response_headers) for rule in RULES]
 
-    return ScanReport(
+    report = ScanReport( # CHALLENGE 6
         url = url,
         final_url = str(response.url),
         status_code = response.status_code,
         findings = findings,
         raw_headers = response_headers,
     )
+
+    _save_cached_report(report, url)  # CHALLENGE 6
+    return report
 
 
 # =============================================================================
@@ -530,6 +549,63 @@ GRADE_RANK: dict[str, int] = {  # CHALLENGE 5
 
 def _grade_rank(grade: str) -> int:  # CHALLENGE 5
     return GRADE_RANK[grade]
+
+
+def _cache_path(url: str) -> Path:  # CHALLENGE 6
+    digest = hashlib.sha256(url.encode("utf-8")).hexdigest()
+    return CACHE_DIR / f"{digest}.json"
+
+
+def _save_cached_report(report: ScanReport, url: str) -> None: # CHALLENGE 6
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    payload = asdict(report)
+    payload["saved_at"] = time.time()
+    _cache_path(url).write_text(json.dumps(payload, indent=2))
+
+
+def _load_cached_report(url: str) -> ScanReport | None: # CHALLENGE 6
+    path = _cache_path(url)
+    if not path.exists():
+        return None
+    
+    try:
+        payload = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    
+    if time.time() - payload.get("saved_at", 0) > CACHE_TTL_SECONDS:
+        return None
+
+    return _rebuild_report_from_payload(payload)
+
+
+def _rebuild_report_from_payload(payload: dict) -> ScanReport: # CHALLENGE 6
+    findings = []
+    for item in payload["findings"]:
+        rule_data = item["rule"]
+        rule = HeaderRule(
+            header=rule_data["header"],
+            severity=rule_data["severity"],
+            description=rule_data["description"],
+            recommendation=rule_data["recommendation"],
+            must_match=rule_data.get("must_match"),
+        )
+        findings.append(
+            HeaderFinding(
+                rule=rule,
+                status=item["status"],
+                actual_value=item.get("actual_value"),
+                note=item["note"],
+            )
+        )
+        return ScanReport(
+            url=payload["url"],
+            final_url=payload["final_url"],
+            status_code=payload["status_code"],
+            findings=findings,
+            raw_headers=payload["raw_headers"],
+        )
+
 
 def _render_report(report: ScanReport, console: Console, verbose: bool = False) -> None:
     """
@@ -640,6 +716,11 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         default = "C",
         help = "Lowest grade that should still exit successfully (default: C).",
     )
+    parser.add_argument(    # CHALLENGE 6
+        "--no-cache",
+        action="store_true",
+        help="Bypass the on-disk cache and force a fresh scan.",
+    )
 
     return parser
 
@@ -668,7 +749,11 @@ def main() -> int:
     # useful detail (DNS failure, connection refused, etc.)
     for target in args.urls:    # CHALLENGE 4
         try:
-            report = scan(target, timeout = args.timeout)
+            report = scan(
+                target, 
+                timeout = args.timeout,
+                no_cache = args.no_cache,
+            )
         except httpx.RequestError as exc:
             console.print(
                 f"[red]Request failed[/red] for {target}: {exc}"    # CHALLENGE 4

@@ -64,7 +64,12 @@ from http_headers_scanner import (
     evaluate_header,
     scan,
     _grade_rank,    # CHALLENGE 5
+    _render_report, # CHALLENGE 7
 )
+
+# CHALLENGE 7
+import io
+from rich.console import Console
 
 # =============================================================================
 # Fixtures — small helpers used by multiple tests
@@ -412,3 +417,27 @@ def test_scan_records_final_url_after_redirect() -> None:
     assert report.url == "http://redirect.example.com/"
     assert report.final_url == "https://redirect.example.com/"
     assert report.status_code == 200
+
+# CHALLENGE 7
+def test_render_report_warns_about_http_to_https_redirect() -> None:
+    """
+    If the user starts with http:// and the site redirects to https://,
+    the renderer should print a warning.
+    """
+    report = ScanReport(
+        url = "http://example.com",
+        final_url = "https://example.com",
+        status_code = 200,
+        findings = [],
+        raw_headers = {},
+    )
+
+    buffer = io.StringIO()
+    console = Console(file = buffer, force_terminal = False, color_system = None)
+
+    _render_report(report, console)
+
+    output = buffer.getvalue()
+    assert "http" in output.lower()
+    assert "https" in output.lower()
+    assert "warning" in output.lower() or "note" in output.lower()

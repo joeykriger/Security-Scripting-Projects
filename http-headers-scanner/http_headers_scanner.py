@@ -651,6 +651,17 @@ def _render_report(report: ScanReport, console: Console, verbose: bool = False) 
             "above is misleading until the site enforces HTTPS"
         )
 
+    # CHALLENGE 7
+    if (
+        report.url.startswith("http://")
+        and report.final_url.startswith("https://")
+    ):
+        console.print(
+            "[yellow]Note:[/yellow] this URL started as HTTP and was upgraded "
+            "to HTTPS via redirect. Without HSTS, the first request is "
+            "vulnerable to interception."
+        )
+
     # The grade panel — big, color-coded, eye-catching
     grade_color = GRADE_COLORS[report.grade]
     panel = Panel(

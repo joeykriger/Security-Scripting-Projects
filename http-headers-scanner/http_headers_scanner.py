@@ -91,6 +91,9 @@ import hashlib
 import time
 from pathlib import Path
 
+# CHALLENGE 8
+import asyncio
+
 # CHALLENGE 6
 CACHE_DIR = Path.home() / ".cache" / "http-headers-scanner"
 CACHE_TTL_SECONDS = 60 * 60
@@ -517,6 +520,55 @@ def scan(
     return report
 
 
+# CHALLENGE 8
+async def scan_async(
+        url: str,
+        *,
+        timeout: float = 10.0,
+        user_agent: str = DEFAULT_USER_AGENT,
+        no_cache: bool = False,
+) -> ScanReport:
+    if not no_cache:
+        cached = _load_cached_report(url)
+        if cached is not None:
+            return cached
+        
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            url,
+            timeout = timeout,
+            follow_redirects = True,
+            headers = {"User-Agent": user_agent},
+        )
+
+    response_headers = dict(response.headers)
+    findings = [evaluate_header(rule, response_headers) for rule in RULES]
+
+    report = ScanReport(
+        url = url,
+        final_url = str(response.url),
+        status_code = response.status_code,
+        findings = findings,
+        raw_headers = response_headers,
+    )
+
+    _save_cached_report(report, url)
+    return report
+
+
+# CHALLENGE 8
+async def run_many(urls: list[str], timeout: float, no_cache: bool) -> list[ScanReport]:
+    semaphore = asyncio.Semaphore(20)
+
+    async def bounded_scan(url: str) -> ScanReport:
+        async with semaphore:
+            return await scan_async(url, timeout = timeout, no_cache = no_cache)
+        
+    tasks = [bounded_scan(url) for url in urls]
+    results = await asyncio.gather(*tasks, return_exceptions = True)
+    return results
+
+
 # =============================================================================
 # CLI rendering — keeps display logic out of the data layer
 # =============================================================================
@@ -752,47 +804,39 @@ def main() -> int:
     args = parser.parse_args()
     console = Console()
 
-    reports = []    # CHALLENGE 4
-
-    # Catch network errors here so the user sees a clean message
-    # instead of a raw traceback. We let httpx's own message bubble
-    # through after our prefix — the underlying error usually has
-    # useful detail (DNS failure, connection refused, etc.)
-    for target in args.urls:    # CHALLENGE 4
+    async def run_cli() -> int:    # CHALLENGE 8
         try:
-            report = scan(
-                target, 
+            reports = await run_many(
+                args.urls,
                 timeout = args.timeout,
                 no_cache = args.no_cache,
             )
         except httpx.RequestError as exc:
-            console.print(
-                f"[red]Request failed[/red] for {target}: {exc}"    # CHALLENGE 4
-            )
+            console.print(f"[red]Request failed[/red]: {exc}")
             return 2
-        
-        reports.append(report)    # CHALLENGE 4
 
-    for report in reports:    # CHALLENGE 4
-        if args.json:
-            report_dict = asdict(report)
-            report_dict["score"] = report.score
-            report_dict["grade"] = report.grade
-            json.dump(report_dict, sys.stdout)
-        else:
-            _render_report(report, console, args.verbose)
-            console.print()
+        for report in reports:    # CHALLENGE 4
+            if args.json:
+                report_dict = asdict(report)
+                report_dict["score"] = report.score
+                report_dict["grade"] = report.grade
+                json.dump(report_dict, sys.stdout)
+            else:
+                _render_report(report, console, args.verbose)
+                console.print()
 
-    # CHALLENGE 5: compare each report's grade against the user-supplied
-    # `--min-grade` threshold. If any report is below the threshold,
-    # return 1. Network errors already return 2 earlier.
-    threshold_rank = _grade_rank(args.min_grade)
+        # CHALLENGE 5: compare each report's grade against the user-supplied
+        # `--min-grade` threshold. If any report is below the threshold,
+        # return 1. Network errors already return 2 earlier.
+        threshold_rank = _grade_rank(args.min_grade)
 
-    for report in reports:  # CHALLENGE 5
-        if _grade_rank(report.grade) < threshold_rank:
-            return 1
+        for report in reports:  # CHALLENGE 5
+            if _grade_rank(report.grade) < threshold_rank:
+                return 1
 
-    return 0  # all reports met or exceeded the threshold
+        return 0  # all reports met or exceeded the threshold
+    
+    return asyncio.run(run_cli())    # CHALLENGE 8
 
 
 # Standard "if invoked directly as a script" guard — lets the file be

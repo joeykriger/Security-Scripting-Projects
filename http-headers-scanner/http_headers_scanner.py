@@ -598,13 +598,13 @@ def _rebuild_report_from_payload(payload: dict) -> ScanReport: # CHALLENGE 6
                 note=item["note"],
             )
         )
-        return ScanReport(
-            url=payload["url"],
-            final_url=payload["final_url"],
-            status_code=payload["status_code"],
-            findings=findings,
-            raw_headers=payload["raw_headers"],
-        )
+    return ScanReport(
+        url=payload["url"],
+        final_url=payload["final_url"],
+        status_code=payload["status_code"],
+        findings=findings,
+        raw_headers=payload["raw_headers"],
+    )
 
 
 def _render_report(report: ScanReport, console: Console, verbose: bool = False) -> None:
